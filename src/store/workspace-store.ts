@@ -11,6 +11,7 @@ export type Todo = {
   dueDate?: string;
   completed: boolean;
   createdAt: string;
+  pinned: boolean;
 };
 
 export type KanbanStatus = "backlog" | "in-progress" | "review" | "done";
@@ -49,8 +50,9 @@ type WorkspaceState = {
   documents: Doc[];
   activeDocumentId: string | null;
   chat: ChatMessage[];
-  addTodo: (payload: Omit<Todo, "id" | "createdAt" | "completed">) => void;
+  addTodo: (payload: Omit<Todo, "id" | "createdAt" | "completed" | "pinned">) => void;
   toggleTodo: (id: string) => void;
+  toggleTodoPin: (id: string) => void;
   updateTodo: (id: string, updates: Partial<Omit<Todo, "id" | "createdAt">>) => void;
   removeTodo: (id: string) => void;
   reorderTodos: (orderedIds: string[]) => void;
@@ -71,6 +73,7 @@ type WorkspaceState = {
 const initialState = (): Omit<WorkspaceState,
   | "addTodo"
   | "toggleTodo"
+  | "toggleTodoPin"
   | "updateTodo"
   | "removeTodo"
   | "reorderTodos"
@@ -95,6 +98,7 @@ const initialState = (): Omit<WorkspaceState,
       dueDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 3).toISOString(),
       completed: false,
       createdAt: new Date().toISOString(),
+      pinned: true,
     },
     {
       id: nanoid(),
@@ -103,6 +107,7 @@ const initialState = (): Omit<WorkspaceState,
       dueDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 1).toISOString(),
       completed: false,
       createdAt: new Date().toISOString(),
+      pinned: false,
     },
   ],
   kanban: [
@@ -170,6 +175,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               dueDate,
               completed: false,
               createdAt: new Date().toISOString(),
+              pinned: false,
             },
             ...state.todos,
           ],
@@ -179,6 +185,13 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         set((state) => ({
           todos: state.todos.map((todo) =>
             todo.id === id ? { ...todo, completed: !todo.completed } : todo,
+          ),
+        }));
+      },
+      toggleTodoPin: (id) => {
+        set((state) => ({
+          todos: state.todos.map((todo) =>
+            todo.id === id ? { ...todo, pinned: !todo.pinned } : todo,
           ),
         }));
       },
@@ -317,7 +330,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       },
     }),
     {
-      name: "atelier-workspace",
+      name: "datamazin-workspace",
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         todos: state.todos,
@@ -326,7 +339,22 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         activeDocumentId: state.activeDocumentId,
         chat: state.chat,
       }),
-      version: 1,
+      version: 2,
+      migrate: (persistedState: unknown, version) => {
+        if (version < 2 && persistedState && typeof persistedState === "object") {
+          const typedState = persistedState as Partial<WorkspaceState>;
+          return {
+            ...typedState,
+            todos: Array.isArray(typedState.todos)
+              ? typedState.todos.map((todo) => ({
+                  ...todo,
+                  pinned: todo?.pinned ?? false,
+                }))
+              : [],
+          } satisfies Partial<WorkspaceState>;
+        }
+        return persistedState;
+      },
       onRehydrateStorage: () => (state) => {
         if (!state?.activeDocumentId && state?.documents?.length) {
           state.activeDocumentId = state.documents[0].id;

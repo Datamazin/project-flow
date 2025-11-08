@@ -1,43 +1,36 @@
-'use client';
+"use client";
 
 import { useMemo, useState } from "react";
-import { CheckCircle2, Circle, Plus, Trash2 } from "lucide-react";
+import { Check, ChevronLeft, MoreHorizontal, Plus, Star, Trash2 } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Panel } from "@/components/ui/panel";
-import { Textarea } from "@/components/ui/textarea";
-import { cn, formatRelativeDate } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { Todo, useWorkspaceStore } from "@/store/workspace-store";
 
 type DraftTodo = {
   title: string;
-  description: string;
-  dueDate: string;
 };
 
 const defaultDraft: DraftTodo = {
   title: "",
-  description: "",
-  dueDate: "",
 };
 
 export function TodoPanel() {
   const [draft, setDraft] = useState<DraftTodo>(defaultDraft);
+  const [composerOpen, setComposerOpen] = useState(false);
+
   const todos = useWorkspaceStore((state) => state.todos);
   const addTodo = useWorkspaceStore((state) => state.addTodo);
   const toggleTodo = useWorkspaceStore((state) => state.toggleTodo);
   const removeTodo = useWorkspaceStore((state) => state.removeTodo);
+  const toggleTodoPin = useWorkspaceStore((state) => state.toggleTodoPin);
 
-  const { completed, upcoming } = useMemo(() => {
-    const completedCount = todos.filter((todo) => todo.completed).length;
-    const upcomingItems = todos.filter((todo) => !todo.completed);
-    return {
-      completed: completedCount,
-      upcoming: upcomingItems,
-    };
-  }, [todos]);
+  const ordered = useMemo(
+    () => [...todos].sort((a, b) => Number(b.pinned) - Number(a.pinned)),
+    [todos],
+  );
 
   const onSubmit = () => {
     if (!draft.title.trim()) {
@@ -46,82 +39,86 @@ export function TodoPanel() {
 
     addTodo({
       title: draft.title.trim(),
-      description: draft.description.trim() || undefined,
-      dueDate: draft.dueDate ? new Date(draft.dueDate).toISOString() : undefined,
     });
     setDraft(defaultDraft);
+    setComposerOpen(false);
   };
 
   return (
-    <Panel tone="warm" className="flex flex-col gap-6">
-      <header className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-xs uppercase tracking-[0.3em] text-slate-700/70 dark:text-slate-200/60">
-            Today&apos;s flow
-          </p>
-          <h2 className="text-2xl font-semibold text-slate-900 dark:text-slate-50">
-            Todo studio
-          </h2>
-        </div>
-        <Badge tone="info" className="shadow-sm">
-          {completed} done · {todos.length} total
-        </Badge>
+    <Panel
+      tone="cool"
+      className="relative flex h-full flex-col gap-8 border-none bg-transparent p-6 text-white shadow-2xl"
+    >
+      <div className="pointer-events-none absolute inset-0 -z-10 bg-[linear-gradient(180deg,#7a85ff_0%,#6672f7_100%),repeating-linear-gradient(180deg,rgba(255,255,255,0.16)_0px,rgba(255,255,255,0.16)_1px,transparent_1px,transparent_60px)] [background-blend-mode:overlay]" />
+
+      <header className="flex items-center justify-between text-sm font-medium text-white/85">
+        <button className="flex items-center gap-2 rounded-full px-2 py-1 transition hover:bg-white/15">
+          <ChevronLeft size={18} />
+          Lists
+        </button>
+        <button className="rounded-full p-2 transition hover:bg-white/15" aria-label="More actions">
+          <MoreHorizontal size={18} />
+        </button>
       </header>
 
-      <div className="grid gap-3 rounded-2xl bg-white/50 p-4 backdrop-blur-xl dark:bg-slate-950/40">
-        <Input
-          value={draft.title}
-          onChange={(event) => setDraft((state) => ({ ...state, title: event.target.value }))}
-          placeholder="Sketch the next brilliant idea..."
-          className="bg-white/80"
-        />
-        <Textarea
-          value={draft.description}
-          onChange={(event) =>
-            setDraft((state) => ({ ...state, description: event.target.value }))
-          }
-          placeholder="Add the color, texture, or context. Optional but delightful."
-          className="min-h-[80px] bg-white/80"
-        />
-        <div className="flex flex-wrap items-center gap-3">
-          <label className="flex flex-col text-xs font-medium uppercase tracking-[0.2em] text-slate-500 dark:text-slate-300">
-            Due
-            <input
-              type="date"
-              value={draft.dueDate}
-              onChange={(event) =>
-                setDraft((state) => ({ ...state, dueDate: event.target.value }))
-              }
-              className="mt-1 w-full rounded-xl border border-white/40 bg-white/80 px-4 py-2 text-sm text-slate-600 shadow-inner transition focus:outline-none focus:ring-2 focus:ring-slate-200 dark:border-slate-800/70 dark:bg-slate-900/50 dark:text-slate-200 md:w-auto"
-            />
-          </label>
-          <Button icon={<Plus size={16} />} onClick={onSubmit} className="md:ml-auto">
-            Add to journey
-          </Button>
-        </div>
+      <div>
+        <h2 className="text-4xl font-semibold leading-tight">Tasks</h2>
       </div>
 
-      <section className="flex flex-col gap-4">
-        {todos.length === 0 && (
-          <p className="text-sm text-slate-600 dark:text-slate-300">
-            Everything is clear — add a new spark above.
-          </p>
+      <section className="flex flex-1 flex-col gap-3">
+        {ordered.length === 0 && (
+          <div className="rounded-3xl bg-white/15 p-4 text-sm text-white/80">
+            Nothing on deck. Tap “Add a Task” below to capture a new intention.
+          </div>
         )}
 
-        {todos.map((todo) => (
+        {ordered.map((todo) => (
           <TodoCard
             key={todo.id}
             todo={todo}
             onToggle={() => toggleTodo(todo.id)}
             onRemove={() => removeTodo(todo.id)}
+            onTogglePin={() => toggleTodoPin(todo.id)}
           />
         ))}
       </section>
 
-      {upcoming.length > 0 && (
-        <footer className="rounded-2xl bg-white/40 p-4 text-xs text-slate-600 backdrop-blur-xl dark:bg-slate-950/40 dark:text-slate-300">
-          {upcoming.length} idea{upcoming.length > 1 ? "s" : ""} waiting for your magic.
-        </footer>
+      {composerOpen ? (
+        <div className="grid gap-3 rounded-3xl bg-white/20 p-4 text-sm text-white/85">
+          <Input
+            value={draft.title}
+            onChange={(event) => setDraft({ title: event.target.value })}
+            placeholder="Name your next win"
+            className="rounded-2xl border-none bg-white text-slate-900 placeholder:text-slate-400"
+          />
+          <div className="flex justify-end gap-3">
+            <Button
+              onClick={() => {
+                setComposerOpen(false);
+                setDraft(defaultDraft);
+              }}
+              variant="ghost"
+              className="rounded-2xl bg-white/10 px-4 py-2 text-white hover:bg-white/20"
+            >
+              Cancel
+            </Button>
+            <Button
+              icon={<Plus size={16} />}
+              onClick={onSubmit}
+              className="rounded-2xl bg-white px-5 py-2 text-indigo-600 hover:bg-indigo-50"
+            >
+              Save task
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <Button
+          icon={<Plus size={18} />}
+          onClick={() => setComposerOpen(true)}
+          className="mt-auto w-full justify-center rounded-3xl bg-white/20 py-4 text-base font-semibold text-white shadow-md transition hover:bg-white/25"
+        >
+          Add a Task
+        </Button>
       )}
     </Panel>
   );
@@ -131,49 +128,47 @@ type TodoCardProps = {
   todo: Todo;
   onToggle: () => void;
   onRemove: () => void;
+  onTogglePin: () => void;
 };
 
-function TodoCard({ todo, onToggle, onRemove }: TodoCardProps) {
-  const Icon = todo.completed ? CheckCircle2 : Circle;
-  const dueLabel = todo.dueDate ? formatRelativeDate(todo.dueDate) : null;
-
+function TodoCard({ todo, onToggle, onRemove, onTogglePin }: TodoCardProps) {
   return (
-    <article
-      className="flex flex-col gap-3 rounded-2xl border border-white/30 bg-white/70 p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg dark:border-slate-800/70 dark:bg-slate-950/50"
-    >
-      <div className="flex items-start gap-3">
+    <article className="flex items-center gap-4 rounded-3xl bg-white px-5 py-4 text-slate-900 shadow-sm shadow-slate-900/10">
+      <button
+        onClick={onToggle}
+        aria-label={todo.completed ? "Mark as not done" : "Mark as done"}
+        className={cn(
+          "flex h-10 w-10 items-center justify-center rounded-full border-2 transition",
+          todo.completed
+            ? "border-indigo-500 bg-indigo-500 text-white shadow"
+            : "border-slate-300 bg-white text-slate-400 hover:border-indigo-400",
+        )}
+      >
+        {todo.completed && <Check size={18} />}
+      </button>
+
+      <div className="flex-1">
+        <h3 className={cn("text-base font-semibold", todo.completed && "line-through text-slate-400")}>{todo.title}</h3>
+      </div>
+
+      <div className="flex items-center gap-2">
         <button
-          onClick={onToggle}
-          className="text-slate-500 transition hover:text-indigo-500"
-          aria-label={todo.completed ? "Mark as not done" : "Mark as done"}
+          onClick={onTogglePin}
+          className={cn(
+            "rounded-full p-2 transition",
+            todo.pinned ? "text-indigo-500 hover:bg-indigo-50" : "text-slate-400 hover:bg-slate-100",
+          )}
+          aria-label={todo.pinned ? "Remove favorite" : "Mark as favorite"}
         >
-          <Icon size={22} />
+          <Star size={18} className={cn(todo.pinned && "fill-current")} strokeWidth={1.5} />
         </button>
-        <div className="flex-1">
-          <h3
-            className={cn(
-              "text-base font-semibold text-slate-900 transition dark:text-slate-100",
-              todo.completed && "line-through text-slate-400 dark:text-slate-500",
-            )}
-          >
-            {todo.title}
-          </h3>
-          {todo.description && (
-            <p className="text-sm text-slate-600 dark:text-slate-300">{todo.description}</p>
-          )}
-          {dueLabel && (
-            <Badge tone="warning" className="mt-2">
-              Due {dueLabel}
-            </Badge>
-          )}
-        </div>
-        <Button
-          variant="ghost"
-          icon={<Trash2 size={16} />}
+        <button
           onClick={onRemove}
-          className="h-fit px-2 py-1 text-slate-500 hover:text-rose-500"
+          className="rounded-full p-2 text-slate-300 transition hover:bg-rose-50 hover:text-rose-500"
           aria-label="Delete todo"
-        />
+        >
+          <Trash2 size={18} />
+        </button>
       </div>
     </article>
   );
